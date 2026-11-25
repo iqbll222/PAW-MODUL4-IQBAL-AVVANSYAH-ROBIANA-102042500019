@@ -19,9 +19,58 @@ class HomeController extends Controller
         // 4. Lakukan paginasi 8 data dengan withQueryString()
         // 5. Ambil list penerbit unik untuk opsi dropdown filter
         // 6. Return view 'home' dengan data buku dan list penerbit
+        $query = Buku::query();
 
-        $buku = Buku::paginate(8);
-        $listPenerbit = collect();
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('judul', 'like', "%{$search}%")
+                    ->orWhere('penulis', 'like', "%{$search}%")
+                    ->orWhere('penerbit', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('penerbit')) {
+            $query->where('penerbit', $request->input('penerbit'));
+        }
+
+        if ($request->filled('status')) {
+            if ($request->input('status') === 'tersedia') {
+                $query->where('stok', '>', 0);
+            } elseif ($request->input('status') === 'habis') {
+                $query->where('stok', '<=', 0);
+            }
+        }
+
+        switch ($request->input('sort')) {
+            case 'judul':
+            case 'judul_asc':
+                $query->orderBy('judul', 'asc');
+                break;
+            case 'judul_desc':
+                $query->orderBy('judul', 'desc');
+                break;
+            case 'tahun':
+            case 'tahun_desc':
+                $query->orderBy('tahun_terbit', 'desc');
+                break;
+            case 'tahun_asc':
+                $query->orderBy('tahun_terbit', 'asc');
+                break;
+            case 'stok':
+            case 'stok_desc':
+                $query->orderBy('stok', 'desc');
+                break;
+            default:
+                $query->latest();
+                break;
+        }
+
+        $buku = $query->paginate(8)->withQueryString();
+        $listPenerbit = Buku::select('penerbit')
+            ->distinct()
+            ->orderBy('penerbit')
+            ->pluck('penerbit');
 
         return view('home', compact('buku', 'listPenerbit'));
     }
